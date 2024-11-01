@@ -681,9 +681,49 @@ namespace WinSW
             {
                 var node = nodeList[i]!;
                 string key = node.Attributes!["name"]?.Value ?? throw new InvalidDataException("'name' is missing");
-                string value = Environment.ExpandEnvironmentVariables(node.Attributes["value"]?.Value ?? throw new InvalidDataException("'value' is missing"));
-                environment[key] = value;
+                string value;
+                if (node.Attributes["value"]?.Value == null && node.Attributes["file"]?.Value != null)
+                {
+                    string? filename = node.Attributes["file"]?.Value ?? null;
+                    if (filename != null)
+                    {
+                        filename = Environment.ExpandEnvironmentVariables(filename);
+                    }
 
+                    if (filename == null || !File.Exists(filename))
+                    {
+                        string? defaultValue = node.Attributes["defaultValue"]?.Value ?? null;
+                        if (defaultValue == null)
+                        {
+                            string? ignoreNotExists = node.Attributes["ignoreNotExists"]?.Value ?? null;
+                            if (ignoreNotExists != null && ignoreNotExists.ToLower().Equals("false"))
+                            {
+                                throw new InvalidDataException("'file' is not exists");
+                            }
+
+                            continue;
+                        }
+
+                        value = Environment.ExpandEnvironmentVariables(defaultValue);
+                    }
+                    else
+                    {
+                        string fileValue = File.ReadAllText(filename);
+                        string? trimSingleLine = node.Attributes["trimSingleLine"]?.Value ?? null;
+                        if (trimSingleLine == null || !trimSingleLine.ToLower().Equals("false"))
+                        {
+                            fileValue = fileValue.Replace("\n", " ").Replace("\r", " ").Trim();
+                        }
+
+                        value = fileValue;
+                    }
+                }
+                else
+                {
+                    value = Environment.ExpandEnvironmentVariables(node.Attributes["value"]?.Value ?? throw new InvalidDataException("'value' is missing"));
+                }
+
+                environment[key] = value;
                 Environment.SetEnvironmentVariable(key, value);
             }
 
